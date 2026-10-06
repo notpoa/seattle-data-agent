@@ -1,8 +1,6 @@
-"""Replaceable transport boundary for real Seattle data tools.
+"""Data-tool interface, shared errors, and an explicitly disabled adapter.
 
-The production transport stays unavailable until official API documentation
-and live catalog/schema/query checks can be completed. Tests inject a fake;
-the API never substitutes fake or cached example results.
+The normal API uses SeattleTools. A disabled adapter fails without sample data.
 """
 
 from typing import Protocol
@@ -23,10 +21,8 @@ class DataTools(Protocol):
 class PendingSeattleTools:
     def _unavailable(self):
         raise DataUnavailable(
-            "Live Seattle integration is not enabled. Official Socrata documentation "
-            "and Seattle catalog access were blocked by the environment proxy (403). "
-            "Allow dev.socrata.com, api.us.socrata.com, and data.seattle.gov in "
-            "environment settings, then complete documentation and live integration checks."
+            "Live Seattle data is not enabled for this application instance. "
+            "Configure a data provider before using these routes."
         )
 
     def search(self, request: Search) -> dict:

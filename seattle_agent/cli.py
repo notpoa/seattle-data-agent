@@ -4,16 +4,19 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 
 from pydantic import TypeAdapter, ValidationError
 
 from .models import DatasetId, Query, Schema, Search
 from .query import QueryError, compile_query
-from .tools import DataUnavailable, PendingSeattleTools
+from .tools import DataUnavailable
+from .socrata import SeattleTools
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Seattle Data Agent tools (live integration pending)")
+    load_dotenv(Path(__file__).resolve().parents[1] / '.env', override=False)
+    parser = argparse.ArgumentParser(description="Seattle Data Agent: official discovery and bounded queries")
     commands = parser.add_subparsers(dest="command", required=True)
     search = commands.add_parser("search", help="Search the official Seattle catalog")
     search.add_argument("text")
@@ -26,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     compile_cmd.add_argument("request_file", type=Path)
     compile_cmd.add_argument("schema_file", type=Path)
     args = parser.parse_args(argv)
-    tools = PendingSeattleTools()
+    tools = SeattleTools()
     try:
         if args.command == "search":
             output = tools.search(Search(text=args.text, limit=args.limit))

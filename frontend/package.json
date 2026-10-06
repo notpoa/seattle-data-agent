@@ -1,0 +1,16 @@
+{
+  "name": "seattle-data-agent-web",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=24"},
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {"next": "16.4.0", "react": "19.3.0", "react-dom": "19.3.0"},
+  "devDependencies": {"typescript": "5.9.3", "@playwright/test": "1.63.0", "@types/node": "^24.0.0", "@types/react": "^19.0.0", "@types/react-dom": "^19.0.0"}
+}

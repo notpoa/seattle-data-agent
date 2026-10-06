@@ -22,6 +22,8 @@ class Column(Contract):
     label: str
     data_type: str
     description: str | None = None
+    observed_min: str | None = None
+    observed_max: str | None = None
 
 
 class Schema(Contract):
@@ -59,7 +61,7 @@ class Filter(Contract):
 
 
 class Metric(Contract):
-    operation: Literal["count", "sum", "avg", "min", "max"]
+    operation: Literal["count", "count_distinct", "sum", "avg", "min", "max"]
     field: ColumnName | None = None
 
     @model_validator(mode="after")
@@ -76,12 +78,18 @@ class Order(Contract):
     direction: Literal["asc", "desc"] = "desc"
 
 
+class TimeBucket(Contract):
+    field: ColumnName
+    interval: Literal["month", "year"] = "month"
+
+
 class Query(Contract):
     dataset_id: DatasetId
     columns: list[ColumnName] = Field(default_factory=list, max_length=12)
     filters: list[Filter] = Field(default_factory=list, max_length=12)
     group_by: list[ColumnName] = Field(default_factory=list, max_length=3)
     metric: Metric | None = None
+    time_bucket: TimeBucket | None = None
     order_by: Order | None = None
     limit: Annotated[int, Field(strict=True, ge=1, le=100)] = 20
 
@@ -89,10 +97,21 @@ class Query(Contract):
     def check_shape(self):
         if self.metric is not None and self.columns:
             raise ValueError("Aggregate queries use group_by, not columns")
-        if self.metric is None and (self.group_by or not self.columns):
+        if self.metric is None and (self.group_by or self.time_bucket or not self.columns):
             raise ValueError("Row queries require explicit columns and cannot group")
         if len(set(self.columns)) != len(self.columns) or len(set(self.group_by)) != len(self.group_by):
             raise ValueError("Repeated fields are not allowed")
+        return self
+
+
+class AnalysisRequest(Contract):
+    dataset_interest: str = Field(min_length=2, max_length=200)
+    question: str = Field(min_length=5, max_length=1500)
+
+    @model_validator(mode="after")
+    def meaningful(self):
+        if not self.dataset_interest.strip() or not self.question.strip():
+            raise ValueError("Tell us what data interests you and what you want to learn")
         return self
 
 

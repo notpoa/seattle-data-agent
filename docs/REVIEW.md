@@ -1,149 +1,54 @@
-# Test and review the query foundation on Windows
+# Review the simple Seattle website
 
-This branch contains a Python backend foundation, not the customer website.
-There is no question box, live dataset discovery, or OpenAI integration yet.
-The interactive FastAPI documentation lets you inspect the backend contracts.
-No API key is needed for this stage.
+Use the setup and run tasks in the [README](../README.md). Open the local website
+at port 8000's root `/`, not `/docs`. It asks for a dataset/topic and your question.
 
-## VS Code buttons (recommended)
+## Review without a model key
 
-Open the repository itself with **File > Open Folder** so `.vscode` is at the
-workspace root. Install Python 3.12 from python.org and the recommended Microsoft
-Python and Python Debugger extensions. Restart VS Code after installing Python
-so its terminal can find the `py` launcher.
+Submit a topic such as "SPD arrests" and a question such as "Show monthly report
+counts in 2025". The page should show real catalog candidates followed by an
+explicit missing-OpenAI-configuration error. This tests browser-to-backend-to-
+catalog discovery, not successful analysis. No mock results are served.
 
-1. Press **Ctrl+Shift+P**, choose **Tasks: Run Task**, and select
-   **Seattle: Set up Python environment**. Wait for "Setup complete".
-2. Run the **Seattle: Run tests** task the same way.
-3. Run **Seattle: Run backend**. Leave its terminal running.
-4. Open `http://127.0.0.1:8000/docs` in your own browser to inspect the API.
+## Review with a backend key
 
-Alternatively, after setup, use **Run and Debug > Seattle: Debug backend** and
-press **F5** to debug with breakpoints. Choose either the run task or the debugger;
-starting both would compete for port 8000. Stop the run task with Ctrl+C or stop
-the debugger with Shift+F5. Select the project's `.venv` through
-**Python: Select Interpreter** if VS Code previously selected another interpreter.
+Create `.env` locally from `.env.example` if one does not already exist. Enter the
+key securely in that local file, restart the backend, and submit a dated question.
+Expect progress as datasets are inspected, then actual tables and an explanation
+or a clarification. Check official sources, query details, retrieval timestamps,
+row definitions, and warnings. A trend chart appears only for suitable, complete
+returned series; chart visibility does not establish source-data completeness.
 
-This runs locally. It does not publish a website. If your error mentions
-`package.json`, `npm`, or Vercel, you are using a frontend workflow that this
-Python-only stage does not yet provide. For an actual Render deployment failure,
-share the failing build/start command and error log, with credentials removed.
+Cross-dataset correlations are not supported yet. The model should explain that
+limitation rather than asserting a correlation. Unsupported assets and upstream
+failures should also remain explicit.
 
-Common local startup errors:
+## Troubleshooting Windows setup
 
-| Error | Next step |
+| Symptom | Action |
 | --- | --- |
-| `py` not recognized or Python 3.12 not found | Install Python 3.12 with its Windows launcher, then restart VS Code. |
-| `.venv` interpreter not found or `No module named uvicorn` | Run the setup task and check that it finishes successfully. |
-| Port/address already in use (`WinError 10048`) | Stop the earlier server task/debug session, or use a different port. |
-| Browser shows 404 at `/` | Open `/docs` or `/health`; the root page is not implemented. |
-| Dataset request returns 503 | Expected at this stage; live transport is not implemented. |
+| `py` missing | Install Python 3.12 with the Windows launcher and restart VS Code. |
+| `npm` missing | Install Node.js LTS and restart VS Code. |
+| `uvicorn` or `dotenv` missing | Run **Seattle: Set up Python environment** again. |
+| Root page says website not built | Run **Seattle: Set up website**, then restart the backend. |
+| Old page after an update | Rebuild the website, restart the backend, and refresh the browser. |
+| Port 8000 is in use | Stop the old backend/debug task before starting another. |
+| AI configuration error | Put the key in the backend `.env` and restart; never use frontend settings. |
+| OpenAI HTTP 401/403/429 | Check key validity, model access, API billing/quota, and retry after resolving the cause. |
+| Socrata HTTP 429 or timeout | Narrow your question and retry later; no results are fabricated. |
 
-The detailed terminal-based instructions below are also supported.
+## Backend contracts
 
-## 1. Get the review branch
+`/docs` remains the developer API explorer. `/health` reports configured
+capabilities, not proof of upstream access or valid credentials. `/api/analyze`
+streams progress/evidence/error events. `/api/datasets/search`,
+`/api/datasets/{id}`, and `/api/query` are the reusable data-tool endpoints.
 
-If you already cloned the project, run from its folder in PowerShell:
-
-```powershell
-git status
-git fetch origin
-git switch --track origin/review/query-foundation
-```
-
-Keep any local work before switching. If you already have the review branch,
-use `git switch review/query-foundation` instead of creating it again.
-
-For a new checkout:
+The CLI can search and inspect independently of the model:
 
 ```powershell
-git clone --branch review/query-foundation https://github.com/notpoa/seattle-data-agent.git
-cd seattle-data-agent
-code .
+.\.venv\Scripts\python.exe -m seattle_agent.cli search "building permits"
 ```
 
-## 2. Install and test
-
-Install Python 3.12, then use the VS Code PowerShell terminal in the project folder:
-
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python.exe -m pip install --no-deps --no-build-isolation -e .
-.\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe -m pytest -v
-```
-
-Expected: no broken requirements and 43 passing tests. A dependency may emit a
-deprecation warning for the HTTP test client. Windows CI is configured; local
-development validation was performed on Linux, not a Windows machine.
-
-Tests cover grouped row counts with a date window, numeric aggregates, literal
-escaping, invalid fields and types, unsupported assets, row limits, API error
-responses, and offline CLI compilation. The fixtures are synthetic test inputs,
-not Seattle facts or live data.
-
-## 3. Start the backend
-
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn seattle_agent.api:app --reload --port 8000
-```
-
-Leave this terminal running. In your own local browser, open
-`http://127.0.0.1:8000/docs`. This is the interactive API documentation, not the
-planned customer website. The root route `/` is not implemented and returns 404.
-
-Use **Try it out**, then **Execute** on these routes:
-
-| Route | Input | Expected result |
-| --- | --- | --- |
-| `GET /health` | None | 200, `status: ok`, `live_data_enabled: false`, `agent_enabled: false` |
-| `POST /api/datasets/search` | `{"text":"trees","limit":5}` | 503 with an explanation that live integration is unavailable |
-| `GET /api/datasets/{dataset_id}` | `abcd-1234` (synthetic format example) | 503; no fabricated schema |
-| `POST /api/query` | `{"dataset_id":"abcd-1234","columns":["area"],"limit":101}` | 422; maximum output limit is 100 |
-| `POST /api/query` | `{"dataset_id":"abcd-1234","sql":"SELECT *"}` | 422; unrestricted SQL is not accepted |
-
-The synthetic ID is only for exercising input validation. It is not a discovered
-Seattle dataset. A valid-shaped query still returns 503 until the real data
-transport is implemented. These expected errors demonstrate honest API behavior;
-they do not demonstrate successful data retrieval.
-
-In a second PowerShell terminal, health and CLI checks are also available:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health
-.\.venv\Scripts\python.exe -m seattle_agent.cli --help
-.\.venv\Scripts\python.exe -m seattle_agent.cli search "trees"
-```
-
-The last command reports unavailable data and exits with code 1. Stop the server
-with Ctrl+C in its terminal.
-
-## 4. See the offline query compiler work
-
-This test exercises a count grouped by area over the complete 2025 calendar year
-using synthetic schema inputs. It verifies the exact compiled parameters:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest tests/test_query.py::test_grouped_ranking_with_explicit_time_window -v
-.\.venv\Scripts\python.exe -m pytest tests/test_api_cli.py::test_offline_cli_compiles_and_labels_output -v
-```
-
-Read `seattle_agent/models.py` for allowed query arguments and
-`seattle_agent/query.py` for schema checks and parameter compilation. Read
-`tests/test_query.py` to see accepted and rejected examples. Information flows
-from a validated request through schema checks to bounded parameters. The next
-connector will send those parameters to Seattle only after API syntax has been
-verified against current official documentation.
-
-## 5. Review changes on GitHub
-
-Select `review/query-foundation` in GitHub's branch dropdown. The changes are on
-that branch, so `main` will still show the original README. The Actions tab shows
-the configured Linux/Windows checks once GitHub runs them. A local passing run
-does not establish that hosted CI has passed.
-
-The next stage completes live discovery, schema inspection, and bounded querying.
-Cloud network access to the official docs and Seattle endpoints must work first;
-see `INTEGRATION.md`. Running this foundation locally does not enable the missing
-connector by itself. Then the OpenAI loop and Next.js interface can be built.
+Only use dataset IDs returned by actual discovery; do not copy synthetic test IDs
+as live sources. The GitHub review branch is `review/query-foundation`.

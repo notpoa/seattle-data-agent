@@ -6,25 +6,28 @@ from seattle_agent.api import create_app
 from seattle_agent.cli import main
 from seattle_agent.models import Query
 from seattle_agent.query import compile_query
+from seattle_agent.tools import PendingSeattleTools
 
 
-def test_server_health_is_not_claim_of_data_readiness():
+def test_server_health_is_not_claim_of_data_readiness(monkeypatch):
+    monkeypatch.setattr('seattle_agent.api.api_key', lambda: None)
     with TestClient(create_app()) as client:
         result = client.get("/health")
         assert result.status_code == 200
-        assert result.json()["live_data_enabled"] is False
+        assert result.json()["live_data_enabled"] is True
         assert result.json()["agent_enabled"] is False
+        assert 'not live upstream connectivity' in result.json()['note']
 
 
 def test_live_routes_fail_honestly():
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(PendingSeattleTools())) as client:
         responses = [client.post("/api/datasets/search", json={"text": "trees"}),
                      client.get("/api/datasets/abcd-1234"),
                      client.post("/api/query", json={"dataset_id": "abcd-1234", "columns": ["area"]})]
         for response in responses:
             assert response.status_code == 503
             assert response.json()["error"] == "data_unavailable"
-            assert "403" in response.json()["detail"]
+            assert "not enabled" in response.json()["detail"]
 
 
 def test_bad_arguments_fail_before_tools():
@@ -58,7 +61,8 @@ def test_api_passes_validated_arguments_to_transport(schema):
         assert response.json()["error"] == "invalid_query"
 
 
-def test_cli_reports_unavailable_to_stderr(capsys):
+def test_cli_reports_unavailable_to_stderr(capsys, monkeypatch):
+    monkeypatch.setattr('seattle_agent.cli.SeattleTools', PendingSeattleTools)
     assert main(["search", "trees"]) == 1
     output = capsys.readouterr()
     assert not output.out

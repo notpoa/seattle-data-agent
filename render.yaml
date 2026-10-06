@@ -1,5 +1,5 @@
-# Preparation only: no deployment performed. This serves the foundation API;
-# it does not yet offer live data or an AI agent.
+# Preparation only; no deployment performed. Render runs the Python backend.
+# Build/deploy the static Next.js frontend separately on Vercel.
 services:
   - type: web
     name: seattle-data-agent-api
@@ -11,3 +11,7 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.14
+      - key: SEATTLE_OPENAI_API_KEY
+        sync: false
+      - key: SEATTLE_OPENAI_MODEL
+        value: gpt-4.1-mini

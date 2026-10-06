@@ -2,6 +2,14 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Seattle: Set up website",
+      "type": "shell",
+      "command": "npm ci && npm run build",
+      "options": {"cwd": "${workspaceFolder}/frontend"},
+      "windows": {"options": {"cwd": "${workspaceFolder}/frontend", "shell": {"executable": "cmd.exe", "args": ["/d", "/c"]}}},
+      "problemMatcher": []
+    },
+    {
       "label": "Seattle: Set up Python environment",
       "type": "process",
       "command": "python3",

@@ -9,3 +9,7 @@ node_modules/
 .next/
 dist/
 coverage/
+out/
+*.tsbuildinfo
+test-results/
+playwright-report/

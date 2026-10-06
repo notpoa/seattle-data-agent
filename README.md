@@ -1,129 +1,171 @@
 # Seattle Data Agent
 
-A website in development for answering Seattle questions by discovering relevant
-datasets in Seattle's official Open Data catalog, inspecting their meaning and
-schema, running bounded queries, and explaining results with sources.
+A simple website with two questions: **What data are you interested in?** and
+**What do you want to learn?** The backend searches Seattle's official Open Data
+catalog, inspects candidate datasets, and lets an OpenAI agent choose bounded
+queries. It presents explanations, actual result tables, charts, and source links.
+No dataset shortlist or SPD-specific query functions are used.
 
-## Actual starting point and current status
+## Run in Windows / VS Code
 
-The inspected checkout at `73620cc` contained only a one-line README. It did not
-contain the expected starter, source files, tests, CLI, or planning documents.
-This first stage builds an **offline query foundation**, not a live data agent.
-
-Implemented:
-
-- Structured, strict query contracts shared by FastAPI, CLI, and future LLM tools.
-- Schema-based validation of identifiers, types, filters, aggregate fields, and sorting.
-- Bounded row selection and row counts, numeric aggregates, and grouped rankings.
-- No arbitrary SQL, Python execution, caller-supplied URLs, or dataset allowlist.
-- FastAPI request validation, explicit unavailable responses, and a local CLI.
-- Automated tests and GitHub Actions for Python 3.12 on Linux and Windows.
-- Render backend configuration (prepared only; nothing deployed).
-
-**Not implemented yet:** live catalog search, upstream schema inspection/querying,
-result provenance and truncation handling, OpenAI loop, percentages/trends,
-multiple-dataset compatibility checks, Next.js website, charts, and Vercel setup.
-The compiler requests one extra row to enable future truncation detection; it
-does not itself fetch or trim results.
-
-Live API documentation and data access returned proxy 403 in this workspace.
-Integration implementation is deferred until current official documentation can
-be read and real Seattle requests tested. There are no simulated live results.
-`/health` confirms server health and explicitly reports that data and agent
-capabilities are disabled. All data routes currently return HTTP 503.
-
-## Run locally in Windows / VS Code
-
-VS Code now includes setup, test, run, and debug controls. See
-[the VS Code walkthrough](docs/REVIEW.md#vs-code-buttons-recommended) for the
-recommended way to start the project without entering each install command.
-
-Install Python 3.12. Open the repository folder in VS Code, then open a PowerShell
-terminal. These commands use the virtual environment directly, so changing
-PowerShell's script execution policy is unnecessary.
+Use Python 3.12 and Node.js 24 (or a compatible newer LTS). Open this repository
+folder in VS Code and install its recommended Python extensions.
 
 ```powershell
-cd C:\path\to\seattle-data-agent
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python.exe -m pip install --no-deps --no-build-isolation -e .
-.\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe -m pytest
+git pull --ff-only origin review/query-foundation
+```
+
+Press **Ctrl+Shift+P > Tasks: Run Task** and run these tasks in order:
+
+1. **Seattle: Set up Python environment**
+2. **Seattle: Set up website** (installs Node dependencies and builds the page)
+3. **Seattle: Run backend**
+
+Open **http://127.0.0.1:8000/** in your own local browser. `/docs` is still available
+for developers, but is not the customer interface. Keep the backend terminal
+running; stop it with Ctrl+C. Restart it after building the website for the first
+time. F5 is also available through **Seattle: Debug backend** after setup.
+
+If Node is missing, install Node.js LTS, then restart VS Code:
+
+```powershell
+winget install --id OpenJS.NodeJS.LTS --exact --source winget
+```
+
+For the terminal equivalent, from the repository root:
+
+```powershell
+py -3.12 scripts/setup_dev.py
+cd frontend
+npm ci
+npm run build
+cd ..
 .\.venv\Scripts\python.exe -m uvicorn seattle_agent.api:app --reload --port 8000
 ```
 
-In another PowerShell terminal:
+## Enable AI analysis
+
+Catalog discovery and the data tools work without an OpenAI key. Automatic
+natural-language analysis needs a backend key with model access and API billing.
+From the repository root:
 
 ```powershell
-cd C:\path\to\seattle-data-agent
-Invoke-RestMethod http://127.0.0.1:8000/health
-$body = @{ text = "trees"; limit = 5 } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/datasets/search -ContentType "application/json" -Body $body
-.\.venv\Scripts\python.exe -m seattle_agent.cli search "trees"
+Copy-Item .env.example .env
+code .env
 ```
 
-The health request succeeds. The search request intentionally reports a real
-unavailable error (PowerShell displays HTTP 503); the CLI exits with code 1.
-FastAPI's generated API documentation is at `/docs` on your local server.
-Press Ctrl+C in the server terminal to stop it.
+Only copy the example if you do not already have a `.env`; preserve existing
+settings. Edit `SEATTLE_OPENAI_API_KEY` locally and restart the backend.
+**Never send the key in chat, commit it, or put it in frontend settings.** `.env`
+is ignored by Git. Without a key, submitting the form still searches the real
+catalog and displays dataset matches followed by a clear configuration error.
 
-On Linux/macOS use `python3 -m venv .venv`, then `.venv/bin/python` in place of
-`.\.venv\Scripts\python.exe` in the same commands.
+| Variable | Where | Purpose |
+| --- | --- | --- |
+| `SEATTLE_OPENAI_API_KEY` | Backend `.env`/environment | OpenAI credential. `OPENAI_API_KEY` is also supported locally as a fallback. |
+| `SEATTLE_OPENAI_MODEL` | Backend | Defaults to `gpt-4.1-mini`; choose a tool-calling model your account can access. |
+| `SEATTLE_FRONTEND_ORIGINS` | Backend deployment | Comma-separated exact frontend origins for CORS. Local Next dev origins are allowed by default. |
+| `NEXT_PUBLIC_API_URL` | Frontend build | HTTPS backend origin for a separate Vercel deployment. No key here. Leave unset when FastAPI serves the website locally. |
 
-## How this stage works
+## What to try
 
-An HTTP request or CLI JSON file becomes a validated `Query`. Only known
-operations are allowed. The compiler then checks the query against a supplied
-`Schema`, rejecting unknown fields, wrong types, and unsupported assets. It
-produces bounded query parameters rather than accepting executable model text.
-The query syntax is a provisional offline contract; official API verification
-remains required before connecting it to a real endpoint.
+- Data: **SPD arrest reports**. Question: **How did the monthly count of distinct
+  arrest numbers change from January through December 2025? Explain what those
+  records represent and any limitations.**
+- Data: **building permits**. Question: **Which permit types had the highest row
+  counts in 2025? Inspect the definitions and ask if the date field is ambiguous.**
 
-For example, a count means **rows**, not automatically people, incidents, reports,
-or offenses. Schema contracts store row definition and coverage as unknown when
-there is no evidence. Query arguments can express a date window, but the compiler
-does not determine completeness, choose a correct denominator, or justify a
-comparison. Those require inspected dataset documentation and analysis logic.
+These are requests, not guaranteed answers: the model can ask a clarification if
+semantics, dates, or coverage are unclear. You can edit the question and submit
+again; each submission is a fresh analysis, not a persistent chat.
 
-The API depends on a `DataTools` interface. Test-only implementations exercise
-the boundary without network access. The production implementation explicitly
-fails until real integration is enabled. Tests never serve example data in the
-application.
+## Capabilities and limits
 
-## Environment variables and credentials
+Implemented: dynamic official Seattle catalog search; metadata/schema inspection;
+validated projections, counts, distinct-identifier counts, numeric aggregates,
+rankings and monthly/yearly trends; one budgeted tool-calling agent loop; streamed
+progress; result tables/charts; source/query details, retrieval times and warnings.
 
-This stage requires no credentials or application environment variables.
-Render supplies `PORT`; `render.yaml` specifies the Python version. Never put
-credentials in source control or frontend variables. `.env` files are ignored.
+**Not supported yet:** cross-dataset joins/correlations, population-adjusted rates,
+percentages with independently verified denominators, forecasting, or arbitrary
+Python/SQL. Multiple datasets can be inspected/queried independently, but separate
+totals do not establish a correlation. Geographic units, dates, identifiers, and
+row definitions must be verified before adding that capability.
 
-The next AI stage will read an OpenAI API key **only in the backend**, select a
-tool-calling model with a backend model setting, and fail clearly if configuration
-is missing. Those settings are not implemented yet. Do not supply secret values
-in chat. Cloud proxy secret targets reserve the `OPENAI_` prefix; a future cloud
-binding must use a permitted backend name and explicit HTTPS destination.
+Counts mean rows unless a distinct identifier is explicitly requested. Rows may
+represent reports, offenses, or other records rather than physical incidents.
+SPD Arrest Data's description specifically distinguishes arrest reports from
+physical in-custody events and flags one-to-many offenses. The tools preserve that
+description; they do not declare every row to be a unique arrest.
 
-## Network access needed to finish stage 1
+Trends require an explicit start and exclusive end date. Cached column min/max
+values are observations, not proof of continuous coverage. Missing periods are
+not zeros; current/boundary periods may be incomplete. Charts are omitted when
+results are truncated or grouping would make a single series misleading.
 
-Allow these domains in the cloud environment settings:
+External GIS, files, maps, and other non-native tabular assets are identified as
+unsupported. Queries are capped at 100 output rows and 1 MB upstream responses;
+aggregate queries can process more input rows. The model sees bounded previews,
+not entire datasets. Sources and table values come from actual tool responses;
+model prose remains an explanation to assess against those sources.
 
-- `dev.socrata.com`: current official discovery, metadata, and query documentation.
-- `api.us.socrata.com`: the catalog API, restricted to Seattle through domain filters.
-- `data.seattle.gov`: official dataset metadata, data, and source pages.
+## How information moves
 
-These additions were saved in an environment draft; a saved draft does not change
-runtime access or publish the environment. Review/save the settings and publish
-when required by the onboarding UI. Then resume official documentation checks,
-live discovery, metadata normalization, and bounded query validation.
+The form sends two strings to FastAPI. The backend searches the catalog with
+Seattle-only domain and official-provenance filters. The model may search again,
+inspect discovered IDs, query inspected fields through structured arguments, and
+finish with an explanation or clarification. The server rejects invented IDs,
+unknown fields, arbitrary SQL, unsupported types, and uninspected queries.
+
+Socrata performs aggregates; no Pandas/DuckDB dependency is needed yet. Tables,
+charts, citations, timestamps, and query details come from server-held results,
+not invented model output. Data descriptions are treated as untrusted evidence,
+never model instructions. The loop has call/iteration/time budgets and explains
+failures instead of displaying simulated results.
+
+The frontend is Next.js/React, statically built into `frontend/out`. FastAPI serves
+it locally, so you only need one server after building. During frontend development
+use `npm run dev` in `frontend` and keep FastAPI on port 8000; port 3000 is the
+separate development interface.
+
+## Tests and validation
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+cd frontend
+npm test
+npm run build
+npm run typecheck
+npx playwright install chromium
+npm run test:browser
+```
+
+Backend tests cover compiler checks, catalog domain restrictions, schema refresh,
+truncation, upstream errors, tool sequencing, missing credentials, and rejection
+of unsupported answers. Frontend unit tests cover stream parsing/state; browser
+tests exercise the form, errors, tables/charts, and source links with explicitly
+synthetic test responses. Those mocks never run in production.
+
+Live Seattle discovery, schema inspection, row counts, and a 12-month 2025 query
+were verified during development. A live OpenAI answer was **not** verified because
+this workspace has no OpenAI key. Linux/Windows backend CI and frontend CI are
+configured; a local pass does not prove hosted CI passed. See
+[verification details](docs/INTEGRATION.md).
 
 ## Deployment preparation
 
-`render.yaml` prepares a Python backend service with `/health` as its health
-check. It currently serves only the foundation API; healthy does not mean live
-analysis works. The build installs pinned dependencies and the package. The
-start command binds to Render's `PORT`. No deployment has
-been performed. Complete live data and agent validation before deploying for
-customers. The frontend and Vercel configuration will be added in stage 3.
+No website has been published. `render.yaml` prepares the Python backend.
+For Vercel, set the project root to `frontend`, use the checked-in `vercel.json`,
+and set `NEXT_PUBLIC_API_URL` to the Render backend's HTTPS origin before building.
+Set `SEATTLE_FRONTEND_ORIGINS` on Render to the exact Vercel origin. Keep
+`SEATTLE_OPENAI_API_KEY` only on Render. Do not deploy the backend's `.env` file.
+Complete a live keyed end-to-end test before inviting customers.
 
-See [the milestone plan](docs/PLAN.md) and [integration verification checklist](docs/INTEGRATION.md).
+Required upstream domains: `api.us.socrata.com`, `data.seattle.gov`, and
+`api.openai.com`. Official integration documentation is at `dev.socrata.com`.
+The initial documentation access issue has been resolved in this cloud instance.
+Current docs describe SODA3 as preferred and requiring authentication/app token;
+this version uses Seattle's still-working public SODA 2 resource endpoints, which
+are also documented. Migration to SODA3 remains a future integration task.
 
-For a step-by-step review on Windows, see [testing this stage](docs/REVIEW.md).
+See [the milestone plan](docs/PLAN.md) and [the VS Code review guide](docs/REVIEW.md).

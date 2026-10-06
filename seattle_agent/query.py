@@ -1,7 +1,7 @@
 """Compile a small structured query language, never arbitrary SQL.
 
-This is an offline compiler contract, pending verification against current
-Socrata documentation and a real Seattle endpoint. No network calls here.
+Current Socrata query/function documentation reviewed; legacy public resource
+queries verified against Seattle. No network calls in this compiler.
 """
 
 from datetime import datetime
@@ -63,24 +63,50 @@ def compile_query(query: Query, schema: Schema) -> dict[str, str]:
     selected = query.columns or query.group_by
     for name in selected:
         require_field(name)
+    group_expressions = list(query.group_by)
+    selection_expressions = list(selected)
+    if query.time_bucket:
+        if 'period' in selected:
+            raise QueryError("Group field 'period' conflicts with the time alias")
+        field = require_field(query.time_bucket.field)
+        if field.data_type not in {"calendar_date", "floating_timestamp"}:
+            raise QueryError("Time buckets currently require a floating/calendar timestamp")
+        # Avoid quietly comparing a partial year with a complete year.
+        operators = {f.operator for f in query.filters if f.field == query.time_bucket.field}
+        if not {'gte', 'lt'} <= operators:
+            raise QueryError("Trends require an explicit start (gte) and exclusive end (lt) date")
+        try:
+            starts = [datetime.fromisoformat(f.value) for f in query.filters if f.field == query.time_bucket.field and f.operator == 'gte']
+            ends = [datetime.fromisoformat(f.value) for f in query.filters if f.field == query.time_bucket.field and f.operator == 'lt']
+            if max(starts) >= min(ends):
+                raise QueryError('Trend start must be earlier than the exclusive end')
+        except (ValueError, TypeError) as exc:
+            raise QueryError('Trends require valid, compatible ISO start and end dates') from exc
+        function = 'date_trunc_ym' if query.time_bucket.interval == 'month' else 'date_trunc_y'
+        expression = f"{function}({query.time_bucket.field})"
+        group_expressions.append(expression)
+        selection_expressions.append(f"{expression} AS period")
     if query.metric:
         if "value" in query.group_by:
             raise QueryError("Group field 'value' conflicts with the metric alias")
         metric = query.metric
         if metric.operation == "count":
             expression = "count(*) AS value"
+        elif metric.operation == "count_distinct":
+            require_field(metric.field)
+            expression = f"count(distinct {metric.field}) AS value"
         else:
             field = require_field(metric.field)
             if field.data_type not in NUMERIC:
                 raise QueryError("Metrics other than row count currently require numeric fields")
             expression = f"{metric.operation}({metric.field}) AS value"
-        select = ", ".join([*selected, expression])
+        select = ", ".join([*selection_expressions, expression])
     else:
         select = ", ".join(selected)
     # One extra row detects output truncation. No pagination or whole-dataset export.
     params = {"$select": select, "$limit": str(query.limit + 1)}
-    if query.group_by:
-        params["$group"] = ", ".join(query.group_by)
+    if group_expressions:
+        params["$group"] = ", ".join(group_expressions)
     clauses = []
     for condition in query.filters:
         field = require_field(condition.field)
@@ -94,8 +120,10 @@ def compile_query(query: Query, schema: Schema) -> dict[str, str]:
     if clauses:
         params["$where"] = " AND ".join(clauses)
     if query.order_by:
-        allowed = {*selected, *(["value"] if query.metric else [])}
+        allowed = {*selected, *(["value"] if query.metric else []), *(["period"] if query.time_bucket else [])}
         if query.order_by.field not in allowed:
             raise QueryError("Sort field must appear in the result")
         params["$order"] = f"{query.order_by.field} {query.order_by.direction.upper()}"
+    elif query.time_bucket:
+        params["$order"] = "period ASC"
     return params
