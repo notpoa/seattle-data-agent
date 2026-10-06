@@ -5,6 +5,42 @@ There is no question box, live dataset discovery, or OpenAI integration yet.
 The interactive FastAPI documentation lets you inspect the backend contracts.
 No API key is needed for this stage.
 
+## VS Code buttons (recommended)
+
+Open the repository itself with **File > Open Folder** so `.vscode` is at the
+workspace root. Install Python 3.12 from python.org and the recommended Microsoft
+Python and Python Debugger extensions. Restart VS Code after installing Python
+so its terminal can find the `py` launcher.
+
+1. Press **Ctrl+Shift+P**, choose **Tasks: Run Task**, and select
+   **Seattle: Set up Python environment**. Wait for "Setup complete".
+2. Run the **Seattle: Run tests** task the same way.
+3. Run **Seattle: Run backend**. Leave its terminal running.
+4. Open `http://127.0.0.1:8000/docs` in your own browser to inspect the API.
+
+Alternatively, after setup, use **Run and Debug > Seattle: Debug backend** and
+press **F5** to debug with breakpoints. Choose either the run task or the debugger;
+starting both would compete for port 8000. Stop the run task with Ctrl+C or stop
+the debugger with Shift+F5. Select the project's `.venv` through
+**Python: Select Interpreter** if VS Code previously selected another interpreter.
+
+This runs locally. It does not publish a website. If your error mentions
+`package.json`, `npm`, or Vercel, you are using a frontend workflow that this
+Python-only stage does not yet provide. For an actual Render deployment failure,
+share the failing build/start command and error log, with credentials removed.
+
+Common local startup errors:
+
+| Error | Next step |
+| --- | --- |
+| `py` not recognized or Python 3.12 not found | Install Python 3.12 with its Windows launcher, then restart VS Code. |
+| `.venv` interpreter not found or `No module named uvicorn` | Run the setup task and check that it finishes successfully. |
+| Port/address already in use (`WinError 10048`) | Stop the earlier server task/debug session, or use a different port. |
+| Browser shows 404 at `/` | Open `/docs` or `/health`; the root page is not implemented. |
+| Dataset request returns 503 | Expected at this stage; live transport is not implemented. |
+
+The detailed terminal-based instructions below are also supported.
+
 ## 1. Get the review branch
 
 If you already cloned the project, run from its folder in PowerShell:

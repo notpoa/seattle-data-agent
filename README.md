@@ -34,6 +34,10 @@ capabilities are disabled. All data routes currently return HTTP 503.
 
 ## Run locally in Windows / VS Code
 
+VS Code now includes setup, test, run, and debug controls. See
+[the VS Code walkthrough](docs/REVIEW.md#vs-code-buttons-recommended) for the
+recommended way to start the project without entering each install command.
+
 Install Python 3.12. Open the repository folder in VS Code, then open a PowerShell
 terminal. These commands use the virtual environment directly, so changing
 PowerShell's script execution policy is unnecessary.
