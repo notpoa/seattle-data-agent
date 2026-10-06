@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seattle-data-agent"
+version = "0.1.0"
+description = "Validated data tools for a Seattle public-data assistant"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.142.2",
+  "httpx==0.28.1",
+  "pydantic==2.13.5",
+  "uvicorn==0.54.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1"]
+
+[project.scripts]
+seattle-data = "seattle_agent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["seattle_agent*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
