@@ -62,7 +62,7 @@ class Filter(Contract):
 
 class Metric(Contract):
     operation: Literal["count", "count_distinct", "sum", "avg", "min", "max"]
-    field: ColumnName | None = None
+    field: ColumnName | None = Field(default=None, description="Omit or use null for count (counts rows). Required for other operations. Use inspected column names, not display labels.")
 
     @model_validator(mode="after")
     def check_field(self):
@@ -102,6 +102,31 @@ class Query(Contract):
         if len(set(self.columns)) != len(self.columns) or len(set(self.group_by)) != len(self.group_by):
             raise ValueError("Repeated fields are not allowed")
         return self
+
+
+class RowQuery(Contract):
+    """Model-facing individual rows; no aggregate fields."""
+    dataset_id: DatasetId
+    columns: list[ColumnName] = Field(min_length=1, max_length=12, description="Exact inspected column names, not display labels.")
+    filters: list[Filter] = Field(default_factory=list, max_length=12)
+    order_by: Order | None = None
+    limit: Annotated[int, Field(strict=True, ge=1, le=100)] = 20
+
+
+class AggregateQuery(Contract):
+    """Model-facing summaries; the server owns aliases and sort fields."""
+    dataset_id: DatasetId
+    group_by: list[ColumnName] = Field(default_factory=list, max_length=3, description="Exact inspected category column names. Empty for a single total. Do not supply columns.")
+    metric: Metric
+    filters: list[Filter] = Field(default_factory=list, max_length=12)
+    time_bucket: TimeBucket | None = None
+    sort: Literal['value_desc', 'value_asc', 'period_asc', 'period_desc'] | None = Field(default=None, description="value_desc for top/highest rankings; period_asc for chronological trends. Never supply order_by.")
+    limit: Annotated[int, Field(strict=True, ge=1, le=100)] = 20
+
+    def to_query(self) -> Query:
+        sort = self.sort or ('period_asc' if self.time_bucket else 'value_desc')
+        field, direction = sort.split('_')
+        return Query(**self.model_dump(exclude={'sort'}), order_by=Order(field=field, direction=direction))
 
 
 class AnalysisRequest(Contract):

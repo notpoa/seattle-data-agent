@@ -133,6 +133,13 @@ shows whether a limit came from time, model steps, or completion, plus the last
 tool error. If multiple date fields could define "in 2025", the agent should ask
 which meaning you intend rather than continuing to search.
 
+The model has separate tools for individual rows (`query`) and summaries
+(`aggregate`). The aggregate tool accepts groups and a metric without `columns`;
+ranking sort choices such as `value_desc` are translated to the correct aggregate
+alias by the server. The shared `/api/query` endpoint and CLI still use the full
+validated query contract. A malformed model call is corrected at the tool
+boundary; it does not mean the requested ranking is an unsupported operation.
+
 The frontend is Next.js/React, statically built into `frontend/out`. FastAPI serves
 it locally, so you only need one server after building. During frontend development
 use `npm run dev` in `frontend` and keep FastAPI on port 8000; port 3000 is the

@@ -46,8 +46,8 @@ def test_schema_overview_finishes_without_unnecessary_query(schema):
 def test_reserved_turn_finishes_and_identical_queries_execute_once(schema):
     data = CountingTools(schema)
     responses = iter([tool('inspect', {'dataset_id': schema.dataset_id}),
-                      tool('query', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}}),
-                      tool('query', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}})])
+                      tool('aggregate', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}}),
+                      tool('aggregate', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}})])
     def model(messages, specs):
         if len(specs) == 1:
             assert specs[0]['function']['name'] == 'finish'
@@ -107,7 +107,7 @@ def test_overview_cannot_bypass_inspection(schema):
 
 def test_analysis_longer_than_old_eight_steps_can_finish(schema):
     responses = iter([tool('inspect', {'dataset_id': schema.dataset_id}), *[
-        tool('query', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}, 'limit': n})
+        tool('aggregate', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}, 'limit': n})
         for n in range(1, 10)], tool('finish', {'status': 'answered', 'message': 'Synthetic analysis completed.'})])
     events = list(analyze(question(), CountingTools(schema), lambda messages, specs: next(responses)))
     assert events[-1]['status'] == 'answered'
@@ -117,8 +117,8 @@ def test_analysis_longer_than_old_eight_steps_can_finish(schema):
 def test_failed_prerequisite_can_be_repaired_before_repeating_query(schema):
     data = CountingTools(schema)
     query = {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}}
-    responses = iter([tool('query', query), tool('inspect', {'dataset_id': schema.dataset_id}),
-                      tool('query', query), tool('finish', {'status': 'answered', 'message': '5 synthetic rows.'})])
+    responses = iter([tool('aggregate', query), tool('inspect', {'dataset_id': schema.dataset_id}),
+                      tool('aggregate', query), tool('finish', {'status': 'answered', 'message': '5 synthetic rows.'})])
     events = list(analyze(question(), data, lambda messages, specs: next(responses)))
     assert data.queries == 1
     assert events[-1]['status'] == 'answered'

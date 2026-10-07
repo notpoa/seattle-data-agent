@@ -9,7 +9,7 @@ import time
 import httpx
 from pydantic import Field, ValidationError
 
-from .models import AnalysisRequest, Contract, DatasetId, Query, Search
+from .models import AggregateQuery, AnalysisRequest, Contract, DatasetId, Query, RowQuery, Search
 from .query import QueryError
 from .socrata import SeattleTools
 from .tools import DataUnavailable
@@ -55,6 +55,15 @@ unless search results are unsuitable. Do not repeat identical search/inspect/que
 calls. After enough evidence, finish rather than gathering unrelated information.
 If a tool fails, correct its arguments using the error; do not repeat the same
 failing call. If the requested calculation is unsupported, explain that promptly. For a monthly/yearly trend use time_bucket with gte and lt date filters.
+Use aggregate for counts, rankings, numeric summaries, and trends. Use query
+only for individual rows. Aggregate takes group_by, metric, filters, limit and
+sort (value_desc for highest counts); it has NO columns or order_by argument.
+For example, a generic ranking uses metric {"operation":"count"}, group_by
+containing an inspected category name, sort "value_desc", and limit 5.
+Use each inspected column's name, not its label. A tool validation error is a
+formatting problem to repair, not proof that the user's calculation is unsupported.
+Do not ask the user to change a valid time window because you formatted a call
+incorrectly. Sorting aliases are created by the server, never by you.
 Today (UTC): """
 
 
@@ -66,7 +75,8 @@ def tool_spec(name, description, contract):
 SPECS = [
     tool_spec('search', 'Find relevant official Seattle catalog assets, no fixed shortlist.', Search),
     tool_spec('inspect', 'Read descriptions, types, updates and observed coverage before querying.', Inspect),
-    tool_spec('query', 'Run a bounded, validated projection or aggregate. Count means rows; count_distinct requires a verified identifier.', Query),
+    tool_spec('query', 'Retrieve bounded individual rows with columns. For counts/rankings/trends use aggregate instead.', RowQuery),
+    tool_spec('aggregate', 'Calculate counts, distinct counts, numeric summaries, rankings or trends. No columns/order_by. For top five use sort=value_desc and limit=5.', AggregateQuery),
     tool_spec('finish', 'Explain actual results, ask a clarification, or describe unsupported analysis.', Finish),
 ]
 
@@ -185,11 +195,15 @@ def analyze(request: AnalysisRequest, tools=None, model_call=None, budget=None, 
                                 raise QueryError('Inspect a discovered dataset before giving an overview')
                             yield {'type': 'answer', **finish.model_dump(), 'diagnostics': diagnostics('completed')}
                             return
-                        contracts = {'search': Search, 'inspect': Inspect, 'query': Query}
+                        contracts = {'search': Search, 'inspect': Inspect, 'query': RowQuery, 'aggregate': AggregateQuery}
                         if name not in contracts:
                             raise QueryError('Unknown tool')
                         arguments = contracts[name].model_validate(args)
-                        identity = (name, json.dumps(arguments.model_dump(mode='json'), sort_keys=True))
+                        if name == 'aggregate':
+                            arguments = arguments.to_query()
+                        elif name == 'query':
+                            arguments = Query.model_validate(arguments.model_dump())
+                        identity = ('query' if name == 'aggregate' else name, json.dumps(arguments.model_dump(mode='json'), sort_keys=True))
                         if identity in cache:
                             stalled += 1
                             output = {**cache[identity], 'agent_note': 'This exact tool call already succeeded. Reuse this evidence and finish, or make a materially different request if needed.'}

@@ -85,7 +85,7 @@ class FakeTools:
 def test_agent_inspects_before_query_and_returns_only_tool_results(schema):
     tools = FakeTools(schema)
     script = iter([call('inspect', {'dataset_id': schema.dataset_id}),
-        call('query', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}}),
+        call('aggregate', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}}),
         call('finish', {'status': 'answered', 'message': 'There are 5 synthetic rows.'})])
     events = list(analyze(AnalysisRequest(dataset_interest='synthetic', question='Count records'), tools,
                          model_call=lambda messages, specs: next(script)))
@@ -97,7 +97,7 @@ def test_agent_inspects_before_query_and_returns_only_tool_results(schema):
 def test_agent_rejects_fabricated_id_and_uninspected_query(schema):
     tools = FakeTools(schema)
     script = iter([call('inspect', {'dataset_id': 'zzzz-0000'}),
-        call('query', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}}),
+        call('aggregate', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}}),
         call('finish', {'status': 'clarification', 'message': 'Please clarify the record definition.'})])
     events = list(analyze(AnalysisRequest(dataset_interest='synthetic', question='Count records'), tools,
                          model_call=lambda messages, specs: next(script)))
@@ -134,7 +134,7 @@ def test_tool_failure_has_no_fabricated_result(schema):
     class FailingTools(FakeTools):
         def query(self, request): raise DataUnavailable('Seattle returned HTTP 429')
     script = iter([call('inspect', {'dataset_id': schema.dataset_id}),
-        call('query', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}}),
+        call('aggregate', {'dataset_id': schema.dataset_id, 'metric': {'operation': 'count'}}),
         call('finish', {'status': 'unsupported', 'message': 'The service is rate limited. Retry later.'})])
     events = list(analyze(AnalysisRequest(dataset_interest='synthetic', question='Count records'), FailingTools(schema),
                          model_call=lambda messages, specs: next(script)))
