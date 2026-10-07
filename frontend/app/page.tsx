@@ -66,10 +66,11 @@ export default function Home() {
     <p className="scope">Counts, comparisons, rankings, and time trends. Cross-dataset correlations aren’t supported yet.</p>
     {busy && <p className="progress" role="status" aria-live="polite"><span className="spinner" />{session.progress || 'Starting your request…'}</p>}
     {session.error && <section className="notice" role="alert" aria-labelledby="analysis-error"><h2 id="analysis-error">Couldn’t complete the analysis</h2><p>{session.error}</p></section>}
-    {session.answer && <section className="answer" aria-live="polite"><p className="eyebrow">{session.status === 'answered' ? 'What the data shows' : session.status === 'clarification' ? 'One more detail' : 'A limitation to know'}</p><p className="answer-text">{session.answer}</p></section>}
+    {session.answer && <section className="answer" aria-live="polite"><p className="eyebrow">{session.status === 'answered' ? 'What the data shows' : session.status === 'overview' ? 'About this dataset' : session.status === 'clarification' ? 'One more detail' : 'A limitation to know'}</p><p className="answer-text">{session.answer}</p></section>}
     {(session.selected.length > 0 || session.datasets.length > 0) && <section className="datasets"><h2>{session.selected.length ? 'Datasets inspected' : 'Datasets found'}</h2><div className="dataset-grid">{(session.selected.length ? session.selected : session.datasets).map(d => <article key={d.dataset_id}><h3>{d.title}</h3><p>{d.description}</p>{d.limitation && <p className="muted">{d.limitation}</p>}<a href={`https://data.seattle.gov/d/${d.dataset_id}`} target="_blank" rel="noreferrer">Official dataset ↗</a></article>)}</div></section>}
     {session.results.map((result, i) => <Table key={i} result={result} />)}
     {!!session.warnings.length && <details className="tool-notes"><summary>Data checks and tool warnings</summary>{session.warnings.map((w, i) => <p key={i}>{w}</p>)}</details>}
+    {session.diagnostics && <details><summary>Request details</summary><p>Outcome: {session.diagnostics.reason}. Model steps: {session.diagnostics.model_steps}. Tool calls: {session.diagnostics.tool_calls}. Successful queries: {session.diagnostics.successful_queries}.</p><p>Last tool: {session.diagnostics.last_tool}</p>{session.diagnostics.last_tool_error && <p>Last tool error: {session.diagnostics.last_tool_error}</p>}</details>}
     <footer>Seattle Open Data · Sources stay attached to every result.<br /><span>Findings depend on dataset definitions and coverage.</span></footer>
   </main>;
 }

@@ -64,6 +64,8 @@ catalog and displays dataset matches followed by a clear configuration error.
 | --- | --- | --- |
 | `SEATTLE_OPENAI_API_KEY` | Backend `.env`/environment | OpenAI credential. `OPENAI_API_KEY` is also supported locally as a fallback. |
 | `SEATTLE_OPENAI_MODEL` | Backend | Defaults to `gpt-4.1-mini`; choose a tool-calling model your account can access. |
+| `SEATTLE_AGENT_MAX_STEPS` | Backend | Defaults to 16 (range 2–32); the final step is reserved for completing the explanation. |
+| `SEATTLE_AGENT_TIMEOUT_SECONDS` | Backend | Defaults to 240 (range 1–600); model calls use the remaining time. |
 | `SEATTLE_FRONTEND_ORIGINS` | Backend deployment | Comma-separated exact frontend origins for CORS. Local Next dev origins are allowed by default. |
 | `NEXT_PUBLIC_API_URL` | Frontend build | HTTPS backend origin for a separate Vercel deployment. No key here. Leave unset when FastAPI serves the website locally. |
 
@@ -122,6 +124,14 @@ charts, citations, timestamps, and query details come from server-held results,
 not invented model output. Data descriptions are treated as untrusted evidence,
 never model instructions. The loop has call/iteration/time budgets and explains
 failures instead of displaying simulated results.
+
+The agent reuses identical tool results within a request instead of fetching them
+again. After repeated failures or redundant calls, it switches to finishing from
+existing evidence. Dataset overviews require inspection but no unnecessary count
+query. Calculated answers still require a successful query. **Request details**
+shows whether a limit came from time, model steps, or completion, plus the last
+tool error. If multiple date fields could define "in 2025", the agent should ask
+which meaning you intend rather than continuing to search.
 
 The frontend is Next.js/React, statically built into `frontend/out`. FastAPI serves
 it locally, so you only need one server after building. During frontend development

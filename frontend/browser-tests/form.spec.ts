@@ -44,3 +44,18 @@ test('disconnected stream is an error instead of a successful empty answer', asy
   await page.getByRole('button', {name: 'Explore the data'}).click();
   await expect(page.getByRole('alert', {name: 'Couldn’t complete the analysis'})).toContainText('connection ended');
 });
+
+test('dataset overview requires no table and diagnostics remain accessible', async ({page}) => {
+  await page.route('**/api/analyze', route => route.fulfill({contentType: 'application/x-ndjson', body: JSON.stringify({
+    type: 'answer', status: 'overview', message: 'Synthetic schema explanation only.',
+    diagnostics: {reason: 'completed', model_steps: 2, tool_calls: 2, inspected_datasets: 1, successful_queries: 0, last_tool: 'finish', last_tool_error: null},
+  })}));
+  await page.goto('/');
+  await page.getByLabel('What data are you interested in?').fill('Test records');
+  await page.getByLabel('What do you want to learn from it?').fill('Explain the fields');
+  await page.getByRole('button', {name: 'Explore the data'}).click();
+  await expect(page.getByText('About this dataset', {exact: true})).toBeVisible();
+  await expect(page.getByRole('table')).toHaveCount(0);
+  await page.getByText('Request details', {exact: true}).click();
+  await expect(page.getByText(/Successful queries: 0/)).toBeVisible();
+});

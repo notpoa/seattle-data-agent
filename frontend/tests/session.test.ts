@@ -17,3 +17,9 @@ test('clarification is not represented as a successful answer', () => {
   const state = reduceEvent(emptySession(), {type: 'answer', status: 'clarification', message: 'Which years?'});
   assert.equal(state.status, 'clarification'); assert.equal(state.results.length, 0);
 });
+test('failure diagnostics preserve the actual last tool error', () => {
+  const diagnostics = {reason: 'time', model_steps: 4, tool_calls: 3, inspected_datasets: 1, successful_queries: 0, last_tool: 'query', last_tool_error: 'query: HTTP 503'};
+  const state = reduceEvent(emptySession(), {type: 'error', message: 'Time limit', diagnostics});
+  assert.deepEqual(state.diagnostics, diagnostics);
+  assert.equal(state.answer, '');
+});
